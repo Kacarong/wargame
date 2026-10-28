@@ -3,7 +3,7 @@ import { EQUIPMENT, EQUIP_BY_ID } from '../data/equipment';
 import type { EquipCat } from '../data/schema';
 import { autoDeploy, createDivision } from '../sim/ai';
 import { CAT_NAMES, canProduce, quality } from '../sim/equip';
-import { disband, divStats, maxOrg, supplyAt } from '../sim/military';
+import { disband, divStats, maxOrg, reconcileDivision, supplyAt } from '../sim/military';
 import type { Battalion, Country, Division, GameState } from '../sim/types';
 import { BATTALION_KINDS, COMPANY_DEFS, makeBattalion, requirements } from '../sim/units';
 import { num } from '../sim/util';
@@ -158,8 +158,8 @@ function DivisionDetail({ ctx, d }: { ctx: UICtx; d: Division }) {
         <Stat k="속도" v={`${st.speed.toFixed(0)} km/일`} />
       </div>
       <ReqTable c={c} d={d} bns={d.battalions} />
-      <div className="muted">대대·중대 구성을 바꾸면 부족한 장비와 병력은 비축분에서 매일 조금씩 보충됩니다.</div>
-      <OrbatEditor ctx={ctx} bns={d.battalions} onChange={(b) => { d.battalions = b; ctx.bump(); }} />
+      <div className="muted">대대·중대 구성을 바꾸면 남는 장비·병력은 즉시 비축으로 돌아가고, 지정 모델은 비축분이 있으면 1:1로 교체됩니다. 부족분은 매일 조금씩 보충됩니다.</div>
+      <OrbatEditor ctx={ctx} bns={d.battalions} onChange={(b) => { d.battalions = b; reconcileDivision(c, d); ctx.bump(); }} />
     </Section>
   );
 }

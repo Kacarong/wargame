@@ -127,8 +127,9 @@ export function divStats(d: Division): DivStats {
     for (const [id, n] of Object.entries(d.equip)) if (EQUIP_BY_ID[id]?.cat === cat) h += n;
     have += Math.min(h, slot!.count);
   }
-  const menFill = req.men ? clamp(d.men / req.men, 0, 1) : 1;
-  const eqFill = need ? have / need : 1;
+  // a division with no units has nothing to fill: treat it as 0% (not 100%)
+  const menFill = req.men ? clamp(d.men / req.men, 0, 1) : 0;
+  const eqFill = need ? have / need : req.men ? 1 : 0;
   const mob = mobN ? mobW / mobN : 25;
   const motorised = vehicles * 10 > req.men * 0.25;
   const st: DivStats = {
@@ -184,6 +185,71 @@ export function fillDivision(c: Country, d: Division, maxPerCat: number, instant
     d.men += take;
     c.manpower -= take / 1000;
   }
+}
+
+/**
+ * Re-organise a division after its order of battle changed:
+ *  - equipment of categories it no longer needs goes back to the stockpile,
+ *  - units of a non-designated model are swapped 1:1 for the designated model when the stockpile has it,
+ *  - anything beyond the new requirement (equipment and personnel) is returned.
+ * Missing equipment is then refilled gradually by the normal daily reinforcement.
+ */
+export function reconcileDivision(c: Country, d: Division): void {
+  const req = requirements(d.battalions);
+  const give = (id: string, n: number) => {
+    if (n <= 0) return;
+    d.equip[id] -= n;
+    c.stockpile[id] = (c.stockpile[id] ?? 0) + n;
+    if (d.equip[id] <= 1e-9) delete d.equip[id];
+  };
+  for (const id of Object.keys(d.equip)) {
+    const e = EQUIP_BY_ID[id];
+    const slot = e ? req.byCat[e.cat] : undefined;
+    if (!slot || slot.count <= 0) give(id, d.equip[id]);
+  }
+  for (const [cat, slot] of Object.entries(req.byCat) as [EquipCat, { count: number; preferred: Record<string, number> }][]) {
+    const heldIds = () => Object.keys(d.equip).filter((id) => EQUIP_BY_ID[id]?.cat === cat);
+    // 1:1 swap of non-designated models for designated ones available in the stockpile
+    for (const [want, wantN] of Object.entries(slot.preferred)) {
+      let deficit = wantN - (d.equip[want] ?? 0);
+      for (const id of heldIds().sort((a, b) => quality(EQUIP_BY_ID[a]) - quality(EQUIP_BY_ID[b]))) {
+        if (deficit <= 0) break;
+        if (id === want) continue;
+        const surplusOfId = (d.equip[id] ?? 0) - (slot.preferred[id] ?? 0);
+        const n = Math.min(Math.floor(surplusOfId), Math.floor(c.stockpile[want] ?? 0), Math.floor(deficit));
+        if (n <= 0) continue;
+        give(id, n);
+        c.stockpile[want] -= n;
+        d.equip[want] = (d.equip[want] ?? 0) + n;
+        deficit -= n;
+      }
+    }
+    // trim excess beyond the new requirement: non-designated (worst first) before designated surplus
+    let held = heldIds().reduce((a, id) => a + d.equip[id], 0);
+    const order = heldIds().sort((a, b) => {
+      const pa = a in slot.preferred ? 1 : 0;
+      const pb = b in slot.preferred ? 1 : 0;
+      return pa - pb || quality(EQUIP_BY_ID[a]) - quality(EQUIP_BY_ID[b]);
+    });
+    for (const id of order) {
+      if (held <= slot.count) break;
+      const keepMin = Math.min(d.equip[id], slot.preferred[id] ?? 0);
+      const n = Math.min(d.equip[id] - keepMin, held - slot.count);
+      give(id, n);
+      held -= n;
+    }
+    for (const id of order) {
+      if (held <= slot.count) break;
+      const n = Math.min(d.equip[id] ?? 0, held - slot.count);
+      give(id, n);
+      held -= n;
+    }
+  }
+  if (d.men > req.men) {
+    c.manpower += (d.men - req.men) / 1000;
+    d.men = req.men;
+  }
+  d.org = Math.min(d.org, maxOrg(d));
 }
 
 /** Return a division's equipment & men to the national pool (disband). */
@@ -434,7 +500,11 @@ export function militaryTick(s: GameState): void {
     if (!d.inBattle) {
       const orgTech = c.techs.reduce((a, t) => a + (TECH_BY_ID[t]?.effects?.orgRecovery ?? 0), 0);
       d.org = Math.min(maxOrg(d), d.org + 2.5 * clamp(sup, 0.2, 1) * (1 + orgTech) * (c.stats.procurement < 0 ? 0.5 : 1));
-      if (sup > 0.45 && divStats(d).fill < 0.995) fillDivision(c, d, 0.02);
+      if (sup > 0.45) {
+        // weekly: swap in designated models that arrived from production since the last re-organisation
+        if (s.day % 7 === d.id % 7) reconcileDivision(c, d);
+        if (divStats(d).fill < 0.995) fillDivision(c, d, 0.02);
+      }
     }
   }
 }
