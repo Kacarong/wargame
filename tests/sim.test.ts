@@ -8,6 +8,8 @@ import { EQUIPMENT, EQUIP_BY_ID } from '../src/data/equipment';
 import { TECHS } from '../src/data/tech';
 import { COUNTRY_DATA } from '../src/data/countries';
 import type { GameState } from '../src/sim/types';
+import { addLine, buyEquipment, justifyWar, proposeBudget, proposeLaw, proposeWar } from '../src/sim/actions';
+import { atWar } from '../src/sim/military';
 
 beforeAll(() => {
   const meta = JSON.parse(readFileSync('public/data/provinces.json', 'utf8'));
@@ -58,4 +60,26 @@ describe('simulation', () => {
     console.log('KOR divs', Object.values(s.divisions).filter((d) => d.owner === 'KOR').length, 'PRK divs', Object.values(s.divisions).filter((d) => d.owner === 'PRK').length, 'cas KOR', s.countries.KOR.stats.casualties.toFixed(0), 'PRK', s.countries.PRK.stats.casualties.toFixed(0));
     expect(finite(s)).toEqual([]);
   }, 120000);
+});
+
+describe('player flows', () => {
+  it('democracy: justification -> parliament war vote; budget & law bills; production & purchase', () => {
+    const s = newGame('KOR');
+    const kor = s.countries.KOR;
+    expect(proposeWar(s, 'KOR', 'PRK')).toMatch(/명분/);
+    expect(justifyWar(s, 'KOR', 'PRK')).toBeNull();
+    for (let i = 0; i < 31; i++) step(s);
+    expect(proposeWar(s, 'KOR', 'PRK')).toBeNull();
+    expect(proposeBudget(s, 'KOR', { ...kor.budget, military: 3.0 }, kor.tax)).toBeNull();
+    expect(proposeLaw(s, 'KOR', { conscription: 'total' }, '총동원')).toBeNull();
+    for (let i = 0; i < 15; i++) step(s);
+    const results = s.bills.filter((b) => b.country === 'KOR' && b.result).map((b) => `${b.title}: ${b.result!.passed ? '가결' : '부결'} ${b.result!.yes}/${b.result!.no}`);
+    console.log(results.join('\n'), '\nat war:', atWar(s, 'KOR', 'PRK'));
+    expect(results.length).toBe(3);
+    expect(kor.laws.conscription).not.toBe('total'); // peacetime total mobilisation should be voted down
+    expect(addLine(s, 'KOR', 'k2')).toBeNull();
+    expect(buyEquipment(s, 'KOR', 'f35a', 20)).toBeNull();
+    expect(buyEquipment(s, 'KOR', 'su57', 5)).toBeTruthy();
+    expect(finite(s)).toEqual([]);
+  }, 60000);
 });

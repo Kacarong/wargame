@@ -180,6 +180,7 @@ function makeCountry(d: CountryData, detailed: boolean): Country {
     stability: d.gov === 'democracy' ? 65 : 60,
     warSupport: 35 + d.budget.military * 3,
     manpower: Math.max(1, d.pop * 1000 * conscriptRate * 0.3 + d.reserve * 0.2),
+    reserveK: d.reserve,
     defIndustry: d.defIndustry,
     mobilization: 0,
     resources: { ...d.resources } as Record<Resource, number>,

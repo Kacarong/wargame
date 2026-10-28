@@ -194,6 +194,21 @@ function aiDivisions(s: GameState, c: Country): void {
   }
   if (!best || best.cover < 0.8) return;
   createDivision(s, c, best.t.id);
+  // wartime: form up to two more divisions a month while equipment and manpower last
+  if (warsOf(s, c.tag).length && c.manpower > 30) for (let i = 0; i < 2; i++) aiDivisionsOnce(s, c);
+}
+
+function aiDivisionsOnce(s: GameState, c: Country): void {
+  for (const t of c.templates) {
+    const req = requirements(t.battalions);
+    let ok = c.manpower * 1000 > req.men;
+    for (const [cat, slot] of Object.entries(req.byCat)) {
+      let have = 0;
+      for (const [id, n] of Object.entries(c.stockpile)) if (EQUIP_BY_ID[id]?.cat === cat) have += n;
+      if (have < slot!.count * 0.8) ok = false;
+    }
+    if (ok) { createDivision(s, c, t.id); return; }
+  }
 }
 
 export function createDivision(s: GameState, c: Country, templateId: number): Division | null {

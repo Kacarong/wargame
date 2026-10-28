@@ -138,7 +138,7 @@ export function divStats(d: Division): DivStats {
     aa,
     armor: armorN ? armorSum / armorN : 0,
     pierce,
-    hardness: clamp((vehicles * 12) / Math.max(1, d.men), 0, 0.85),
+    hardness: clamp((vehicles * 6) / Math.max(1, d.men), 0, 0.85),
     speed: motorised ? 25 + mob * 0.35 : 18,
     reqMen: req.men,
     fill: (menFill + eqFill) / 2,
@@ -382,7 +382,8 @@ export function militaryTick(s: GameState): void {
     const sup = supplyAt(s, d.owner, d.prov);
     const st = divStats(d);
     const dist = d.seaMove ? km(prov(d.prov), prov(next)) : Math.max(30, km(prov(d.prov), prov(next)) * 0.8);
-    const speed = d.seaMove ? 350 : st.speed * clamp(sup, 0.4, 1) * (d.org < 20 ? 0.5 : 1);
+    // advancing into hostile ground (mines, drones, partisans) is far slower than moving behind your own lines
+    const speed = d.seaMove ? 350 : st.speed * clamp(sup, 0.4, 1) * (d.org < 20 ? 0.5 : 1) * (hostile ? 0.3 : 1);
     if (d.moveProgress < dist) {
       d.moveProgress += speed;
       if (d.moveProgress < dist) continue;
@@ -611,6 +612,8 @@ export function declareWar(s: GameState, attacker: string, target: string, justi
   ct.warSupport = clamp(ct.warSupport + 30, 0, 100);
   ct.stability = clamp(ct.stability + 5, 0, 100);
   log(s, `${ca.name}이(가) ${ct.name}에 선전포고했습니다!`, [attacker, target], true);
+  callUpReserves(s, attacker);
+  callUpReserves(s, target);
   // defensive alliances
   for (const al of s.alliances) {
     if (!al.mutualDefense || !al.members.includes(target)) continue;
@@ -619,6 +622,7 @@ export function declareWar(s: GameState, attacker: string, target: string, justi
       if (!cm || !cm.alive || m === target || m === attacker || war.defenders.includes(m) || war.attackers.includes(m)) continue;
       if (s.alliances.some((x) => x.mutualDefense && x.members.includes(m) && x.members.includes(attacker))) continue;
       war.defenders.push(m);
+      callUpReserves(s, m);
       cm.warSupport = clamp(cm.warSupport + 15, 0, 100);
       log(s, `${cm.name}이(가) ${al.name}에 따라 ${ct.name} 편으로 참전했습니다.`, [m, target], true);
     }
@@ -629,6 +633,16 @@ export function declareWar(s: GameState, attacker: string, target: string, justi
     addRel(s, c.tag, attacker, justified ? -5 : -20);
   }
   invalidateSupply();
+}
+
+/** Wartime call-up: half of the trained reservists become available manpower. */
+export function callUpReserves(s: GameState, tag: string): void {
+  const c = s.countries[tag];
+  if (!c || c.reserveK < 1) return;
+  const n = c.reserveK * 0.5;
+  c.reserveK -= n;
+  c.manpower += n;
+  if (tag === s.player) log(s, `예비군 동원령: 예비역 ${Math.round(n * 1000).toLocaleString()}명 소집`, [tag], true);
 }
 
 /** End a war. `annex` = winners keep the provinces they control. */

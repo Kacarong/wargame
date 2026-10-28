@@ -188,6 +188,7 @@ export interface Country {
   stability: number;
   warSupport: number;
   manpower: number; // available recruitable personnel (thousands)
+  reserveK: number; // trained reservists not yet called up (thousands)
   defIndustry: number; // B$/yr base capacity
   mobilization: number; // 0..1 ramp toward economy law target
   resources: Record<Resource, number>;

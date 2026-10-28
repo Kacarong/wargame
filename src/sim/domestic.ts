@@ -381,6 +381,8 @@ export function predictVote(s: GameState, b: Bill): { yes: number; no: number; b
   const byParty = c.parties.map((p, i) => {
     let score = (p.gov ? 0.35 : -0.3) + p.hawk * b.stance.hawk + p.econ * b.stance.econ + ((c.approval - 50) / 100) * (p.gov ? 0.5 : -0.3);
     if (b.kind === 'war') score += (c.warSupport - 50) / 60 + (p.hawk - 0.2) * 0.6;
+    // militarisation without a war is a hard sell to any legislature
+    if (b.kind !== 'war' && b.stance.hawk > 0 && !atPeaceExempt(s, c.tag)) score -= b.stance.hawk * 0.6;
     if (b.law?.press && b.law.press !== 'free' && c.gov === 'democracy') score -= p.gov ? 0.2 : 0.6;
     // deterministic per-bill noise
     score += (((b.id * 7919 + i * 104729) % 1000) / 1000 - 0.5) * 0.2;
@@ -389,6 +391,10 @@ export function predictVote(s: GameState, b: Bill): { yes: number; no: number; b
     return { name: p.name, seats: p.seats, yes: y };
   });
   return { yes, no, byParty };
+}
+
+function atPeaceExempt(s: GameState, tag: string): boolean {
+  return warsOf(s, tag).length > 0 || s.tension > 70;
 }
 
 export function billTick(s: GameState): void {
