@@ -93,12 +93,28 @@ export interface DivStats {
   fill: number; // 0..1 overall equipment+men fill
 }
 
-const statCache = new WeakMap<Division, { key: string; st: DivStats }>();
+const statCache = new WeakMap<Division, { men: number; eq: string; bns: Division['battalions']; st: DivStats }>();
+
+/**
+ * Cache key: personnel + per-model equipment counts. The order of battle is keyed by identity of the
+ * battalions array (every UI/AI edit replaces it); in-place edits must call invalidateDivStats().
+ */
+function equipKey(d: Division): string {
+  let k = '';
+  for (const id in d.equip) k += id + ':' + Math.round(d.equip[id] * 100) + ',';
+  return k;
+}
+
+/** Drop a division's cached combat stats (call after mutating its equipment or order of battle). */
+export function invalidateDivStats(d: Division): void {
+  statCache.delete(d);
+}
 
 export function divStats(d: Division): DivStats {
-  const key = `${d.men | 0}|${Object.values(d.equip).reduce((a, b) => a + b, 0) | 0}|${d.battalions.length}`;
+  const men = Math.round(d.men);
+  const eq = equipKey(d);
   const hit = statCache.get(d);
-  if (hit && hit.key === key) return hit.st;
+  if (hit && hit.men === men && hit.bns === d.battalions && hit.eq === eq) return hit.st;
   let soft = 0, hard = 0, def = 0, aa = 0, armorSum = 0, armorN = 0, pierce = 0, vehicles = 0;
   let mobW = 0, mobN = 0;
   for (const [id, n] of Object.entries(d.equip)) {
@@ -144,7 +160,7 @@ export function divStats(d: Division): DivStats {
     reqMen: req.men,
     fill: (menFill + eqFill) / 2,
   };
-  statCache.set(d, { key, st });
+  statCache.set(d, { men, eq, bns: d.battalions, st });
   return st;
 }
 
@@ -249,6 +265,7 @@ export function reconcileDivision(c: Country, d: Division): void {
     c.manpower += (d.men - req.men) / 1000;
     d.men = req.men;
   }
+  statCache.delete(d);
   d.org = Math.min(d.org, maxOrg(d));
 }
 

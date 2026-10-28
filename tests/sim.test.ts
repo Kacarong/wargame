@@ -145,3 +145,33 @@ describe('order of battle changes', () => {
     expect(d.men).toBeLessThanOrEqual(req.men);
   });
 });
+
+describe('division stats cache', () => {
+  it('model swap with unchanged totals updates combat stats', () => {
+    const s = newGame('KOR');
+    const c = s.countries.KOR;
+    const d = Object.values(s.divisions).find((x) => x.owner === 'KOR' && (x.equip.k2 ?? 0) > 0)!;
+    const before = divStats(d); // warm the cache
+    const tankNeed = requirements(d.battalions).byCat.tank!.count;
+    for (const b of d.battalions) for (const comp of b.companies) if (comp.type === 'tank') comp.equip = 'k1a2';
+    c.stockpile.k1a2 = (c.stockpile.k1a2 ?? 0) + tankNeed * 2;
+    reconcileDivision(c, d);
+    const after = divStats(d);
+    const fresh = divStats(JSON.parse(JSON.stringify(d))); // uncached recomputation of the same division
+    expect(after.soft).not.toBeCloseTo(before.soft, 3);
+    expect(after.soft).toBeCloseTo(fresh.soft, 6);
+    expect(after.hard).toBeCloseTo(fresh.hard, 6);
+  });
+
+  it('changing battalion kinds at equal battalion count updates stats without reconcile', () => {
+    const s = newGame('KOR');
+    const d = Object.values(s.divisions).find((x) => x.owner === 'KOR' && x.battalions.some((b) => b.kind === 'tank_bn'))!;
+    const before = divStats(d);
+    const i = d.battalions.findIndex((b) => b.kind === 'tank_bn');
+    d.battalions = d.battalions.map((b, j) => (j === i ? { ...b, kind: 'inf_bn', companies: [{ type: 'hq' }, { type: 'inf' }, { type: 'inf' }, { type: 'inf' }] } : b));
+    const after = divStats(d);
+    const fresh = divStats(JSON.parse(JSON.stringify(d)));
+    expect(after.fill).not.toBeCloseTo(before.fill, 6);
+    expect(after.fill).toBeCloseTo(fresh.fill, 6);
+  });
+});
