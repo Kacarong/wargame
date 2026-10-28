@@ -1,6 +1,6 @@
 // Player-facing commands. Each returns an error string (Korean) or null on success.
 import { EQUIP_BY_ID } from '../data/equipment';
-import { canProduce, exportable, TECH_BY_ID } from './equip';
+import { canProduce, discontinued, exportable, gameYear, TECH_BY_ID } from './equip';
 import { availableTechs, budgetStance, lawStance, researchSlots, submitBill } from './domestic';
 import { atWar, endWar, friendly, occupiedShare, warScore } from './military';
 import type { Budget, GameState, Laws } from './types';
@@ -22,6 +22,8 @@ export function cancelResearch(s: GameState, tag: string, tech: string): void {
 export function addLine(s: GameState, tag: string, equip: string): string | null {
   const c = s.countries[tag];
   const e = EQUIP_BY_ID[equip];
+  if (e && discontinued(e)) return `${e.name}은(는) 생산이 종료된 장비입니다. 해외 중고 구매만 가능합니다.`;
+  if (e && e.year > gameYear()) return `${e.name}은(는) ${e.year}년 실전배치 이후 생산할 수 있습니다.`;
   if (!e || !canProduce(c, e)) return '생산 권한(기술/설계국/라이선스)이 없습니다.';
   const ex = c.lines.find((l) => l.equip === equip);
   if (ex) { ex.lines++; return null; }

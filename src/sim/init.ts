@@ -3,7 +3,7 @@ import { EQUIP_BY_ID } from '../data/equipment';
 import { TECHS } from '../data/tech';
 import type { CountryData, EquipCat, GovType, Resource } from '../data/schema';
 import { AIR_CATS, NAVAL_CATS } from '../data/schema';
-import { quality } from './equip';
+import { quality, setGameYear } from './equip';
 import { coreProvinces, prov, world } from './world';
 import type { Battalion, Country, Division, GameState, Party } from './types';
 import { buildArchetype, COMPANY_DEFS, DIVISION_ARCHETYPES, requirements } from './units';
@@ -339,6 +339,7 @@ const RIVALS: [string, string, number][] = [
 ];
 
 export function newGame(player: string): GameState {
+  setGameYear(2026);
   const s: GameState = {
     version: 1,
     day: 0,

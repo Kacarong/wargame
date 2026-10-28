@@ -3,7 +3,7 @@ import { EQUIPMENT, EQUIP_BY_ID } from '../data/equipment';
 import type { EquipCat } from '../data/schema';
 import { industryCap, lineDemand } from '../sim/domestic';
 import { addLine, buyEquipment, canBuy, licensePrice, purchasePrice, requestLicense, setLines } from '../sim/actions';
-import { CAT_NAMES, canProduce, exportable, quality, TECH_BY_ID } from '../sim/equip';
+import { CAT_NAMES, canProduce, discontinued, exportable, gameYear, quality, TECH_BY_ID } from '../sim/equip';
 import { money, num } from '../sim/util';
 import { Bar, Section, Stat, type UICtx } from './common';
 
@@ -86,7 +86,7 @@ export function ProductionPanel({ ctx }: { ctx: UICtx }) {
                   )}
                 </span>
               </div>
-              <div className="muted">{e.desc} {!tech && <span className="bad">· 기술 미보유({TECH_BY_ID[e.tech]?.name})</span>}</div>
+              <div className="muted">{e.desc} {!tech && <span className="bad">· 기술 미보유({TECH_BY_ID[e.tech]?.name})</span>}{e.year > gameYear() && <span className="bad"> · {e.year}년 실전배치 이후 생산 가능</span>}{discontinued(e) && <span className="bad"> · 생산 종료</span>}</div>
             </div>
           );
         })}

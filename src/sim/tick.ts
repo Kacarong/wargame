@@ -3,11 +3,13 @@ import { billTick, economyTick, politicsMonthly, productionTick, researchTick, w
 import { militaryTick, warsOf, warTick } from './military';
 import type { GameState } from './types';
 import { dateOf, log } from './util';
+import { setGameYear } from './equip';
 
 /** Advance the simulation by one day. */
 export function step(s: GameState): void {
   if (s.gameOver) return;
   s.day++;
+  setGameYear(dateOf(s.day).getUTCFullYear());
   const wg = worldGdp(s);
   const countries = Object.values(s.countries).filter((c) => c.alive);
   for (const c of countries) {

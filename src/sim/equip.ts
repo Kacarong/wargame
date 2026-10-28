@@ -54,8 +54,30 @@ export function hasTech(c: Country, tech: string): boolean {
   return c.techs.includes(tech);
 }
 
+/** Current in-game year; equipment cannot be mass-produced before its real service-entry year. */
+let GAME_YEAR = 2026;
+export function setGameYear(y: number): void {
+  GAME_YEAR = y;
+}
+export function gameYear(): number {
+  return GAME_YEAR;
+}
+
 /** Can the country set up domestic production lines for this item? */
+/** Real production lines that are closed (retired classes, ended programmes). */
+const DISCONTINUED = new Set([
+  'f22a', 'b2', 'b1b', 'b52h', 'tu95ms', 'tu22m3', 'f14a', 'il28', 'mig21', 'mig23', 'f4e', 'f5e', 'f15c', 'su24m', 'tornado',
+  'sa2', 'sa3', 'hawk', 'm48a5', 'm60a3', 't55', 't62m', 'type59', 'kirov', 'slava', 'ticonderoga', 'seawolf', 'ohio',
+  'nimitz', 'oliver_perry', 'la_class', 'akula', 'oscar2', 'sovremenny', 'udaloy', 'kidd', 'kuznetsov', 'cdg', 'wasp',
+  'vanguard', 'triomphant', 'romeo', 'krivak', 'najin', 'kdx1', 'pohang', 'type209', 'kilo877', 'm101', 'm114', 'd20', 'm46',
+]);
+
+export function discontinued(e: Equipment): boolean {
+  return DISCONTINUED.has(e.id) || e.year < GAME_YEAR - 40;
+}
+
 export function canProduce(c: Country, e: Equipment): boolean {
+  if (e.year > GAME_YEAR || discontinued(e)) return false;
   if (!hasTech(c, e.tech)) return false;
   if (e.origin === c.tag) return true;
   if (e.partners?.includes(c.tag)) return true;
