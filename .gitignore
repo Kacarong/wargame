@@ -3,3 +3,4 @@ dist
 data-src
 *.log
 .vite
+tsconfig.tsbuildinfo
